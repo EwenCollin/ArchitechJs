@@ -22,6 +22,8 @@ Inspired by NEM (Nested Explorative Maps by Pauline Olivier, Renaud Chabrier, Da
 The whole code added is in the main.js file (all the logic of the 3D editor). This may be changed in the future if I make updates.
 
 ## Screeshots
-
+![House](/screenshots/house.png?raw=true "House")
+![Street](/screenshots/street.png?raw=true "Street")
+![Balcony](/screenshots/balcony.png?raw=true "Balcony")
 
 
