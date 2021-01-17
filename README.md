@@ -13,3 +13,15 @@ Inspired by NEM (Nested Explorative Maps by Pauline Olivier, Renaud Chabrier, Da
 
  - use Z (azerty keyboard) or W (qwerty keyboard) to create 3D form (keep pressed to change size)
  - use A (azerty keyboard) or Q (qwerty keyboard) to draw (3D lines)
+
+## Library used in this web app
+
+ - ThreeJs r124
+ - ThreeJs-CSG (TS version)
+
+The whole code added is in the main.js file (all the logic of the 3D editor). This may be changed in the future if I make updates.
+
+## Screeshots
+
+
+
