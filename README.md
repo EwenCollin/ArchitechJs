@@ -23,7 +23,7 @@ The whole code added is in the main.js file (all the logic of the 3D editor). Th
 
 ## Screeshots
 ![House](/screenshots/house.png?raw=true "House")
-![Street](/screenshots/street.png?raw=true "Street")
+![Street](/screenshots/facades.png?raw=true "Street")
 ![Balcony](/screenshots/balcony.png?raw=true "Balcony")
 
 
