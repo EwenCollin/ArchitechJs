@@ -3,21 +3,20 @@ import * as THREE from '../build/three.module.js';
 import { GUI } from './jsm/libs/dat.gui.module.js';
 
 import { MapControls } from './jsm/controls/OrbitControls.js';
-import { Line2 } from './jsm/lines/Line2.js';
-import { LineMaterial } from './jsm/lines/LineMaterial.js';
-import { LineGeometry } from './jsm/lines/LineGeometry.js';
-import { GeometryUtils } from './jsm/utils/GeometryUtils.js';
 import { TransformControls } from './jsm/controls/TransformControls.js';
 import { CSG } from './ext/threejs-csg.js';
 
 let camera, controls, scene, renderer;
 let transformControl;
 
+let meshSelection = [];
+let meshSelectionGroup;
 let mousePointerCube, linesGroup, cursorLine;
 let matLine;
 let maxLinePoints = 1000;
 let rectsGroup, currentRect;
 
+let mousePointerCubeId = "mousePointerCube";
 
 var rectColor = new THREE.Color(255, 255, 255);
 
@@ -66,69 +65,26 @@ function init() {
 
 	controls.maxPolarAngle = Math.PI / 2;
 
-	//transform controls
-
-	transformControl = new TransformControls(camera, renderer.domElement);
-	transformControl.addEventListener('change', render);
-	transformControl.addEventListener('dragging-changed', function (event) {
-
-		controls.enabled = !event.value;
-
-	});
-	scene.add(transformControl);
 	// panel
 	createPanel();
 	// world
-	linesGroup = new THREE.Group();
-	scene.add(linesGroup);
-	rectsGroup = new THREE.Group();
-	scene.add(rectsGroup);
 
 	var planeGeo = new THREE.PlaneBufferGeometry(300, 300);
-	var planeMaterial = new THREE.MeshStandardMaterial({color: 0x55ffff});
+	var planeMaterial = new THREE.MeshStandardMaterial({ color: 0x55ffff });
 	var planeMesh = new THREE.Mesh(planeGeo, planeMaterial);
 	planeMesh.castShadow = true;
 	planeMesh.receiveShadow = true;
 	scene.add(planeMesh);
-	planeMesh.rotation.x = - Math.PI/2;
+	planeMesh.rotation.x = - Math.PI / 2;
 
-	var lineGeometry = new LineGeometry();
-	var positions = new Float32Array(maxLinePoints * 3);
-	lineGeometry.setPositions(positions);
-	matLine = new LineMaterial({
 
-		color: 0xff00ff,
-		linewidth: 3, // in pixels
-		vertexColors: true,
-		//resolution:  // to be set by renderer, eventually
-		dashed: false
 
-	});
-	matLine.resolution.set(window.innerWidth, window.innerHeight);
-
-	cursorLine = new Line2(lineGeometry, matLine);
-	cursorLine.scale.set(1, 1, 1);
-	//line.geometry.setDrawRange(0, 500);
-	linesGroup.add(cursorLine);
-
-	mousePointerCube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshPhongMaterial({ color: 0xff00ff, flatShading: true }));
-	scene.add(mousePointerCube);
-
-	//CURRENT Rect
-
-	var rectBoxBufferGeometry = new THREE.BoxBufferGeometry(1, 1, 1);
-	var rectMaterial = new THREE.MeshStandardMaterial({ color: rectColor });
-
-	currentRect = new THREE.Mesh(rectBoxBufferGeometry, rectMaterial);
-	currentRect.castShadow = true;
-	currentRect.receiveShadow = true;
-	rectsGroup.add(currentRect);
-
+	addInitContent();
 
 	// lights
 
 	const light = new THREE.DirectionalLight(0xffffff, 0.7, 100);
-	light.position.set(1000, 1000, 1000); //default; light shining from top
+	light.position.set(100, 100, 100); //default; light shining from top
 	light.castShadow = true; // default false
 	light.shadow.camera.near = 0.5; // default
 	light.shadow.camera.far = 10000;
@@ -144,7 +100,7 @@ function init() {
 	scene.add(light);
 
 	const light2 = new THREE.DirectionalLight(0xffcccc, 0.3, 100);
-	light2.position.set(-1000, 1000, -1000); //default; light shining from top
+	light2.position.set(-100, 100, -100); //default; light shining from top
 	light2.castShadow = true; // default false
 	light2.shadow.camera.near = 0.5; // default
 	light2.shadow.camera.far = 10000;
@@ -191,11 +147,14 @@ function animate() {
 }
 
 function render() {
-
+	highlightSelectedMeshes();
 	renderer.render(scene, camera);
 }
 
+
+var mousePos = new THREE.Vector2();
 function onMouseMove(evt) {
+	mousePos.set(evt.clientX, evt.clientY);
 
 	evt.preventDefault();
 
@@ -232,13 +191,137 @@ function getIntersects(point, objects) {
 
 }
 function keyEventDispatcher(e) {
+	console.log(e.code);
 	if (e.code === "KeyQ") tracePoints();
 	if (e.code === "KeyW") makeRect();
+	if (e.code === "KeyS") selectMeshes();
+	if (e.code === "Delete") deleteSelectedMeshes();
 }
 
 function keyEventReleaser(e) {
 	releasePoints();
 	releaseRect();
+}
+
+function deleteSelectedMeshes() {
+	transformControl.detach();
+	rectsGroup.clear();
+	addCurrentRect();
+	for(var i = 0; i < meshSelection.length; i++) {
+		var cMesh = meshSelection[i];
+		cMesh.geometry.dispose();
+		cMesh.material.dispose();
+		scene.remove(cMesh);
+	}
+	meshSelection = [];
+}
+
+function selectMeshes() {
+
+	const array = getMousePosition(renderer.domElement, mousePos.x, mousePos.y);
+	onClickPosition.fromArray(array);
+
+	const intersects = getIntersects(onClickPosition, scene.children);
+	const intersectsToRemove = getIntersects(onClickPosition, meshSelectionGroup.children);
+
+	var done = false;
+	var i = 0;
+	var selectedNewMesh = undefined;
+	while (i < intersects.length && !done) {
+		if (intersects[i].object.position !== mousePointerCube.position) {
+			if(!meshSelection.includes(intersects[i].object)) {
+				selectedNewMesh = intersects[i].object;
+			}
+			done = true;
+		}
+		i++;
+	}
+	i = 0;
+	done = false;
+	var selectedOldMesh = undefined;
+	while (i < intersectsToRemove.length && !done) {
+		if (intersectsToRemove[i].object.position !== mousePointerCube.position) {
+			if(!meshSelection.includes(intersectsToRemove[i].object)) {
+				selectedOldMesh = intersectsToRemove[i].object;
+			}
+			done = true;
+		}
+		i++;
+	}
+
+	var change = undefined;
+	if(selectedNewMesh !== undefined && selectedOldMesh !== undefined) {
+		if (selectedOldMesh.position.distanceTo(camera.position) < selectedNewMesh.position.distanceTo(camera.position)) change = true;
+		else change = false;
+	}
+	if (selectedNewMesh !== undefined) change = false;
+	else if (selectedOldMesh !== undefined) change = true;
+
+	if (change === true) {
+		meshSelection.splice(meshSelection.indexOf(selectedOldMesh), 1);
+		scene.add(selectedOldMesh);
+		meshSelectionGroup.remove(selectedOldMesh);
+		if (meshSelection.length < 1) transformControl.detach();
+	}
+	else if(change === false) {
+		transformControl.attach(meshSelectionGroup);
+		meshSelection.push(selectedNewMesh);
+		meshSelectionGroup.add(selectedNewMesh);
+	}
+}
+function unselectMeshes() {
+
+	const array = getMousePosition(renderer.domElement, mousePos.x, mousePos.y);
+	onClickPosition.fromArray(array);
+
+	const intersects = getIntersects(onClickPosition, scene.children);
+
+	var done = false;
+	var i = 0;
+	while (i < intersects.length && !done) {
+		if (intersects[i].object.position !== mousePointerCube.position) {
+			if(meshSelection.includes(intersects[i].object)) {
+			}
+			done = true;
+		}
+		i++;
+	}
+}
+function emptyMeshesSelection() {
+	transformControl.detach();
+	moveGroupToGroup(meshSelectionGroup, scene);
+	meshSelection = [];
+}
+function highlightSelectedMeshes() {
+	if (meshSelection.length > 0) {
+		for(var i = 0; i < meshSelection.length; i++) {
+			var cMesh = meshSelection[i];
+			cMesh.material.emissive = new THREE.Color(255, 255, 0);
+			cMesh.material.emissiveIntensity = 1;
+		}
+		for(var i = 0; i < scene.children.length; i++) {
+			var cMesh = scene.children[i];
+			if (meshSelection.includes(cMesh)) {
+				cMesh.material.emissive = new THREE.Color(255, 255, 0);
+				cMesh.material.emissiveIntensity = 1;
+			}
+			else{
+				if (cMesh.material !== undefined) {
+					cMesh.material.emissive = new THREE.Color(0, 0, 0);
+					cMesh.material.emissiveIntensity = 0;
+				}
+			}
+		}
+	}
+	else{
+		for(var i = 0; i < scene.children.length; i++) {
+			var cMesh = scene.children[i];
+			if (cMesh.material !== undefined) {
+				cMesh.material.emissive = new THREE.Color(0, 0, 0);
+				cMesh.material.emissiveIntensity = 0;
+			}
+		}
+	}
 }
 
 var isDrawingRect = false;
@@ -254,7 +337,7 @@ function makeRect() {
 	if (currentRect.scale.x < 0.1 && currentRect.scale.x > -0.1) currentRect.scale.x = 0.1;
 	if (currentRect.scale.y < 0.1 && currentRect.scale.y > -0.1) currentRect.scale.y = 0.1;
 	if (currentRect.scale.z < 0.1 && currentRect.scale.z > -0.1) currentRect.scale.z = 0.1;
-	
+
 	currentRect.scale.copy(mousePointerCube.position.clone().sub(rectOrigin));
 	currentRect.position.set((mousePointerCube.position.clone().x + rectOrigin.clone().x) / 2, (mousePointerCube.position.clone().y + rectOrigin.clone().y) / 2, (mousePointerCube.position.clone().z + rectOrigin.clone().z) / 2);
 }
@@ -270,7 +353,7 @@ function releaseRect() {
 
 		//NEXT RECT
 		var rectBoxBufferGeometry = new THREE.BoxBufferGeometry(1, 1, 1);
-		var rectMaterial = new THREE.MeshStandardMaterial({ color: rectColor});
+		var rectMaterial = new THREE.MeshStandardMaterial({ color: rectColor });
 
 		currentRect = new THREE.Mesh(rectBoxBufferGeometry, rectMaterial);
 		rectsGroup.add(currentRect);
@@ -305,32 +388,26 @@ function tracePoints() {
 		positions[index++] = z;
 
 	}
-	console.log(positions);
-	console.log(points);
-	cursorLine.geometry.instanceCount = maxLinePoints;
-	console.log(cursorLine);
-	cursorLine.geometry.setPositions(positions);
-	//updatePositions();
+	var positionsTyped = new Float32Array(positions);
+	cursorLine.geometry.setDrawRange(0, maxLinePoints);
+	cursorLine.geometry.setAttribute('position', new THREE.BufferAttribute(positionsTyped, 3));
 }
 function releasePoints() {
 	points = [];
-	var lineGeometry = new LineGeometry();
+	var lineGeometry = new THREE.BufferGeometry();
 	var positions = new Float32Array(maxLinePoints * 3);
-	lineGeometry.setPositions(positions);
-	matLine = new LineMaterial({
+	lineGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+	matLine = new THREE.LineBasicMaterial({
 
 		color: 0xff00ff,
-		linewidth: 3, // in pixels
 		vertexColors: true,
 		//resolution:  // to be set by renderer, eventually
 		dashed: false
 
 	});
-	matLine.resolution.set(window.innerWidth, window.innerHeight);
 
-	cursorLine = new Line2(lineGeometry, matLine);
+	cursorLine = new THREE.Line(lineGeometry, matLine);
 	cursorLine.scale.set(1, 1, 1);
-	//line.geometry.setDrawRange(0, 500);
 	linesGroup.add(cursorLine);
 }
 
@@ -363,8 +440,10 @@ function createPanel() {
 	const panel = new GUI({ width: 310 });
 
 	const folder1 = panel.addFolder('Object Mode');
+	const folder1b = panel.addFolder('Selection');
 	const folder2 = panel.addFolder('Actions');
 	const folder3 = panel.addFolder('Add color');
+	const folder4 = panel.addFolder('Scene');
 
 
 	settings = {
@@ -373,12 +452,15 @@ function createPanel() {
 		'scale': transformControlSetScale,
 		'translate / scale snap resolution': 1,
 		'rotate snap resolution': 15,
+		'empty selection': emptyMeshesSelection,
 		'cut in': rectTransformCut,
 		'add': rectTransformAdd,
 		'cut in minimal cut': 0.5,
 		'red': 200,
 		'green': 200,
-		'blue': 200
+		'blue': 200,
+		'download scene': dlSaveScene,
+		'load from JSON': loadScene
 	};
 
 	folder1.add(settings, 'translate');
@@ -387,6 +469,8 @@ function createPanel() {
 	folder1.add(settings, 'translate / scale snap resolution', 0.01, 100).listen().onChange(transformControlSnapTS);
 	folder1.add(settings, 'rotate snap resolution', 1, 90).listen().onChange(transformControlSnapR);
 	folder1.open();
+	folder1b.add(settings, 'empty selection');
+	folder1b.open();
 	folder2.add(settings, 'cut in');
 	folder2.add(settings, 'cut in minimal cut', 0.1, 10).listen().onChange(rectTransformCutSetAmount);
 	folder2.add(settings, 'add');
@@ -395,8 +479,47 @@ function createPanel() {
 	folder3.add(settings, 'green', 0, 255).listen().onChange(rectTransformAddCG);
 	folder3.add(settings, 'blue', 0, 255).listen().onChange(rectTransformAddCB);
 	folder3.open();
+	folder4.add(settings, 'download scene');
+	folder4.add(settings, 'load from JSON');
 }
 
+function loadScene() {
+	var input = document.createElement('input');
+	input.type = 'file';
+	input.onchange = e => {
+
+		// getting a hold of the file reference
+		var file = e.target.files[0];
+		// setting up the reader
+		var reader = new FileReader();
+		reader.readAsText(file, 'UTF-8');
+		// here we tell the reader what to do when it's done reading...
+		reader.onload = readerEvent => {
+			var content = readerEvent.target.result; // this is the content!
+			console.log(content);
+			scene = new THREE.ObjectLoader().parse(JSON.parse(content));
+			addInitContent();
+			input.remove();
+		}
+	}
+	input.click();
+}
+
+function dlSaveScene() {
+	console.log(scene);
+	scene.updateMatrixWorld();
+	linesGroup.remove(cursorLine);
+	for (var i = 0; i < linesGroup.children.length; i++) {
+		var cLine = linesGroup.children[i];
+		cLine.geometry.computeBoundingBox();
+		cLine.geometry.computeBoundingSphere();
+	}
+
+	removeInitContent();
+
+	const json = scene.toJSON();
+	downloadStringAsJson(JSON.stringify(json));
+}
 
 function rectTransformAddCR(value) {
 	for (var i = 0; i < rectsGroup.children.length; i++) {
@@ -481,7 +604,7 @@ function rectTransformAdd() {
 		cRect.geometry.dispose();
 	}
 	var rectBoxBufferGeometry = new THREE.BoxBufferGeometry(1, 1, 1);
-	var rectMaterial = new THREE.MeshStandardMaterial({ color: rectColor});
+	var rectMaterial = new THREE.MeshStandardMaterial({ color: rectColor });
 
 	currentRect = new THREE.Mesh(rectBoxBufferGeometry, rectMaterial);
 	rectsGroup.add(currentRect);
@@ -539,5 +662,97 @@ function cutInMesh(meshA, meshB) {
 	var bspResult = bspB.subtract(bspA);
 	var meshResult = CSG.toMesh(bspResult, meshB.matrix);
 	meshResult.material = meshB.material;
+	var bufferGeometry = new THREE.BufferGeometry();
+	bufferGeometry = bufferGeometry.fromGeometry(meshResult.geometry);
+	meshResult.geometry = bufferGeometry;
 	return meshResult;
+}
+
+function downloadStringAsJson(str, exportName) {
+	var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(str);
+	var downloadAnchorNode = document.createElement('a');
+	downloadAnchorNode.setAttribute("href", dataStr);
+	downloadAnchorNode.setAttribute("download", exportName + ".json");
+	document.body.appendChild(downloadAnchorNode); // required for firefox
+	downloadAnchorNode.click();
+	downloadAnchorNode.remove();
+}
+
+function moveGroupToGroup(groupFrom, groupTo) {
+	for(var i = 0; i < groupFrom.children.length; i++) {
+		groupTo.add(groupFrom.children[i]);
+	}
+	groupFrom.clear();
+}
+
+
+function removeInitContent() {
+	scene.remove(mousePointerCube);
+	scene.remove(cursorLine);
+	scene.remove(currentRect);
+	scene.remove(transformControl);
+}
+
+function addInitContent() {
+	addMousePointerCube();
+	addCurrentRect();
+	addCursorLine();
+	addTransformControl();
+	addMeshSelectionGroup();
+}
+
+function addMeshSelectionGroup() {
+	meshSelectionGroup = new THREE.Group();
+	scene.add(meshSelectionGroup);
+}
+
+function addTransformControl() {
+	//transform controls
+
+	transformControl = new TransformControls(camera, renderer.domElement);
+	transformControl.addEventListener('change', render);
+	transformControl.addEventListener('dragging-changed', function (event) {
+
+		controls.enabled = !event.value;
+
+	});
+	scene.add(transformControl);
+}
+
+function addMousePointerCube() {
+	mousePointerCube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshPhongMaterial({ color: 0xff00ff, flatShading: true }));
+	scene.add(mousePointerCube);
+}
+
+function addCursorLine() {
+	linesGroup = new THREE.Group();
+	scene.add(linesGroup);
+	var lineGeometry = new THREE.BufferGeometry();
+	var positions = new Float32Array(maxLinePoints * 3);
+	lineGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+	matLine = new THREE.LineBasicMaterial({
+
+		color: 0xff00ff,
+		vertexColors: true,
+		//resolution:  // to be set by renderer, eventually
+		dashed: false
+
+	});
+
+	cursorLine = new THREE.Line(lineGeometry, matLine);
+	cursorLine.scale.set(1, 1, 1);
+	linesGroup.add(cursorLine);
+}
+function addCurrentRect() {
+	rectsGroup = new THREE.Group();
+	scene.add(rectsGroup);
+	//CURRENT Rect
+
+	var rectBoxBufferGeometry = new THREE.BoxBufferGeometry(1, 1, 1);
+	var rectMaterial = new THREE.MeshStandardMaterial({ color: rectColor });
+
+	currentRect = new THREE.Mesh(rectBoxBufferGeometry, rectMaterial);
+	currentRect.castShadow = true;
+	currentRect.receiveShadow = true;
+	rectsGroup.add(currentRect);
 }
