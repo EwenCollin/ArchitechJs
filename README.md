@@ -17,6 +17,8 @@ Inspired by NEM (Nested Explorative Maps by Pauline Olivier, Renaud Chabrier, Da
 ### To select multiple meshes
 
  - use S to select or deselect objects (rotation and scale transformations are relative to the whole selection)
+ - use C to copy selection
+ - use V to paste copied selection at same position it was copied
 
 ## Library used in this web app
 
