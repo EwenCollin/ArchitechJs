@@ -1,18 +1,18 @@
 import * as THREE from '../../../build/three.module.js';
 import { CSG } from '../../ext/threejs-csg.js';
 
-var MeshTransform = function() {
-    
-    this.changeColor = function(group, red, green, blue) {
+var MeshTransform = function () {
+
+    this.changeColor = function (group, red, green, blue) {
         for (var i = 0; i < group.children.length; i++) {
             var cRect = group.children[i];
-            if(red !== undefined) cRect.material.color.r = red / 255;
-            if(green !== undefined) cRect.material.color.g = green / 255;
-            if(blue !== undefined) cRect.material.color.b = blue / 255;
+            if (red !== undefined) cRect.material.color.r = red / 255;
+            if (green !== undefined) cRect.material.color.g = green / 255;
+            if (blue !== undefined) cRect.material.color.b = blue / 255;
         }
     }
 
-    this.cutGroup = function(meshGroup, transformCutMinAmount, scene) {
+    this.cutGroup = function (meshGroup, transformCutMinAmount, scene) {
         for (var i = 0; i < meshGroup.children.length; i++) {
             var cRect = meshGroup.children[i];
             if (cRect.scale.x < transformCutMinAmount && cRect.scale.x > - transformCutMinAmount) cRect.scale.x = transformCutMinAmount;
@@ -40,13 +40,24 @@ var MeshTransform = function() {
         }
     }
 
-    this.moveMeshToGroup = function(mesh, meshGroup, scene) {
-        scene.add(mesh);
+    this.moveMeshToGroup = function (mesh, meshGroup, scene) {
+        var newRect = mesh.clone();
+        scene.add(newRect);
+        newRect.castShadow = true;
+        newRect.receiveShadow = true;
+        newRect.applyMatrix(meshGroup.matrix);
         meshGroup.remove(mesh);
-        mesh.position.add(meshGroup.position);
+        mesh.material.dispose();
+        mesh.geometry.dispose();
+        return newRect;
     }
 
-    this.moveToGroup = function(meshGroup, scene) {
+    this.attachToGroup = function(mesh, meshGroup, parent) {
+        meshGroup.attach(mesh);
+        parent.remove(mesh);
+    }
+
+    this.moveToGroup = function (meshGroup, scene) {
         for (var i = 0; i < meshGroup.children.length; i++) {
             var cRect = meshGroup.children[i];
             if (cRect.scale.x < 0) {
@@ -58,39 +69,45 @@ var MeshTransform = function() {
             if (cRect.scale.z < 0) {
                 cRect.scale.z = - cRect.scale.z;
             }
-            var newRect = cRect.clone();
-            scene.add(newRect);
-            newRect.castShadow = true;
-            newRect.receiveShadow = true;
-            newRect.position.add(meshGroup.position.negate());
-            meshGroup.remove(cRect);
-            cRect.material.dispose();
-            cRect.geometry.dispose();
+            this.moveMeshToGroup(cRect, meshGroup, scene);
         }
     }
 
-    this.addMeshToGroup = function(mesh, group) {
+    this.addMeshToGroup = function (mesh, group) {
+        
         var vectors = [];
         var objects = [];
-        for(var i = 0; i < group.children.length; i++) {
+        for (var i = 0; i < group.children.length; i++) {
             objects.push(group.children[i]);
             vectors.push(group.children[i].position);
         }
         vectors.push(mesh.position);
         var newGroupPos = new THREE.Vector3();
-        for(var i = 0; i < vectors.length; i++) {
+        for (var i = 0; i < vectors.length; i++) {
             newGroupPos.add(vectors[i]);
         }
         newGroupPos.divideScalar(vectors.length);
-        group.clear();
-        group.position.copy(newGroupPos);
-        for (var i = 0; i < objects.length; i++) {
-            group.add(objects[i]);
+
+        for(var i = 0; i < objects.length; i++) {
+            objects[i] = this.moveMeshToGroup(objects[i], group, group.parent);
         }
-        group.add(mesh);
+
+        group.position.copy(newGroupPos);
+        var lastMeshRotation = new THREE.Quaternion();
+        mesh.getWorldQuaternion(lastMeshRotation);
+        group.setRotationFromQuaternion(lastMeshRotation);
+        group.scale.set(1, 1, 1);
+        group.updateMatrix();
+        group.updateMatrixWorld();
+
+        for(var i = 0; i < objects.length; i++) {
+            this.attachToGroup(objects[i], group, group.parent);
+        }
+        group.attach(mesh);
+        console.log(group);
     }
-    
-    this.detectCollisions = function(object, cObjects) {
+
+    this.detectCollisions = function (object, cObjects) {
         var detectedCollisions = [];
         for (var i = 0; i < cObjects.length; i++) {
             if (this.detectCollisionCubes(object, cObjects[i])) detectedCollisions.push(cObjects[i]);
@@ -98,7 +115,7 @@ var MeshTransform = function() {
         return detectedCollisions;
     }
 
-    this.detectCollisionCubes = function(object1, object2) {
+    this.detectCollisionCubes = function (object1, object2) {
         if (object1.geometry === undefined || object2.geometry === undefined || object1.id === object2.id) return false;
         object1.geometry.computeBoundingBox();
         object2.geometry.computeBoundingBox();
@@ -114,7 +131,7 @@ var MeshTransform = function() {
         return box1.intersectsBox(box2);
     }
 
-    this.cutInMesh = function(meshA, meshB) {
+    this.cutInMesh = function (meshA, meshB) {
         meshA.updateMatrix();
         meshB.updateMatrix();
         var bspA = CSG.fromMesh(meshA);

@@ -27,6 +27,7 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
 
     this.tick = function() {
         this.highlightSelection();
+        this.updateSelectionChildrenMatrix();
     }
 
     this.init = function() {
@@ -38,6 +39,7 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
     this.resetSceneContent = function() {
         this.meshTransform.moveToGroup(this.meshSelectionGroup, this.scene);
         this.meshSelection = [];
+        this.scene.remove(this.meshSelectionGroup);
     }
 
     this.selectMeshes = function(mousePos) {
@@ -82,7 +84,9 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
         if (change === true) {
             this.meshSelection.splice(this.meshSelection.indexOf(selectedOldMesh), 1);
             this.meshTransform.moveMeshToGroup(selectedOldMesh, this.meshSelectionGroup, this.scene);
-            if (this.meshSelection.length < 1) this.transformControl.detach();
+            if (this.meshSelection.length < 1) {
+                this.emptyMeshSelection();
+            }
         }
         else if (change === false) {
             //TODO : center selection group position on selected objects
@@ -104,9 +108,12 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
     }
 
     this.emptyMeshSelection = function() {
+        console.log("full mesh selection reset");
         this.transformControl.detach();
         this.meshTransform.moveToGroup(this.meshSelectionGroup, scene);
 	    this.meshSelection = [];
+        this.resetSceneContent();
+        this.init();
     }
 
     this.highlightSelection = function() {
@@ -149,6 +156,13 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
 
     this.setColor = function(red, green, blue) {
         self.meshTransform.changeColor(self.meshSelectionGroup, red, green, blue);
+    }
+
+    this.updateSelectionChildrenMatrix = function() {
+        var group = this.meshSelectionGroup.children;
+        for (var i = 0; i < group.length; i++) {
+            group[i].updateMatrixWorld();
+        }
     }
 
 }
