@@ -14,12 +14,16 @@ Inspired by NEM (Nested Explorative Maps by Pauline Olivier, Renaud Chabrier, Da
  - use Z (azerty keyboard) or W (qwerty keyboard) to create 3D form (keep pressed to change size)
  - use A (azerty keyboard) or Q (qwerty keyboard) to draw (3D lines)
 
+### To select multiple meshes
+
+ - use S to select or deselect objects (rotation and scale transformations are relative to the whole selection)
+
 ## Library used in this web app
 
  - ThreeJs r124
  - ThreeJs-CSG (TS version)
 
-The whole code added is in the main.js file (all the logic of the 3D editor). This may be changed in the future if I make updates.
+The whole code added is in the /js folder (all the logic of the 3D editor). It is written in several files and classes to be more human readable and upgradable.
 
 ## Screeshots
 ![House](/screenshots/house.png?raw=true "House")
