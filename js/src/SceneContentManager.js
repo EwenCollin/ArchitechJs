@@ -1,14 +1,36 @@
 import * as THREE from '../../build/three.module.js';
 
-var SceneContentManager = function (scene, camera) {
+var SceneContentManager = function (scene, aspectRatio) {
+    var self = this;
     this.scene = scene;
-    this.camera = camera;
+    this.camera;
+    this.aspectRatio = aspectRatio;
+
+    this.elements = [];
 
     this.groundReset = function (addPlane) {
+        this.camera = new THREE.PerspectiveCamera(60, aspectRatio, 1, 1000);
         this.scene.clear();
         if(addPlane) this.addPlane();
         this.addLights();
+        this.scene.add(this.camera);
         this.camera.position.set(400, 200, 0);
+        return this.camera;
+    }
+
+    this.resetAfterLoad = function() {
+        self.resetContent();
+        self.camera = new THREE.PerspectiveCamera(60, aspectRatio, 1, 1000);
+        self.addLights();
+        self.scene.add(self.camera);
+        self.camera.position.set(400, 200, 0);
+    }
+
+    this.resetContent = function() {
+        for(var i = 0; i < self.elements.length; i++) {
+            self.scene.remove(self.elements[i]);
+        }
+        self.elements = [];
     }
 
     this.addPlane = function () {
@@ -50,6 +72,7 @@ var SceneContentManager = function (scene, camera) {
         light2.shadow.camera.top = d;
         light2.shadow.camera.bottom = - d;
         this.scene.add(light2);
+        this.elements.push(light, light2);
     }
 }
 

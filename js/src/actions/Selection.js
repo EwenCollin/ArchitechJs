@@ -15,8 +15,6 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
 
     this.mouseRaycast = new MouseRaycast(this.raycaster, this.camera);
 
-    this.meshSelection = [];
-
     this.transformControl = transformControl;
 
     this.meshTransform = new MeshTransform();
@@ -24,22 +22,50 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
     this.cutMinAmount = 0.5;
 
     this.meshSelectionGroup;
+    this.meshCopyGroup;
+
+    this.selectionHelpers = [];
 
     this.tick = function() {
         this.highlightSelection();
         this.updateSelectionChildrenMatrix();
     }
 
-    this.init = function() {
+    this.init = function(soft) {
+        this.copyPosition = new THREE.Vector3();
         this.meshSelectionGroup = new THREE.Group();
         this.scene.add(this.meshSelectionGroup);
+        if (soft !== true) {
+            this.meshCopyGroup = new THREE.Group();
+            this.meshCopyGroup.visible = false;
+            this.scene.add(this.meshCopyGroup);
+        }
     }
-    this.init();
+    this.init(false);
 
-    this.resetSceneContent = function() {
+    this.resetSceneContent = function(soft) {
         this.meshTransform.moveToGroup(this.meshSelectionGroup, this.scene);
-        this.meshSelection = [];
         this.scene.remove(this.meshSelectionGroup);
+        if(soft !== true) this.scene.remove(this.meshCopyGroup);
+    }
+
+    this.copySelection = function() {
+        for(var i = 0; i < this.meshCopyGroup.children.length; i++) {
+            var cMesh = this.meshCopyGroup.children[i];
+            cMesh.geometry.dispose();
+            cMesh.material.dispose();
+            this.meshCopyGroup.remove(cMesh);
+        }
+        //TODO : preserve rotation and scale in copy group
+        this.meshCopyGroup.position.copy(this.meshSelectionGroup.position);
+        this.meshTransform.cloneToGroup(this.meshSelectionGroup, this.meshCopyGroup);
+    }
+
+    this.pasteCopy = function() {
+        this.emptyMeshSelection();
+        this.meshSelectionGroup.position.copy(this.meshCopyGroup.position);
+        this.meshTransform.cloneToGroup(this.meshCopyGroup, this.meshSelectionGroup);
+        this.transformControl.attach(this.meshSelectionGroup);
     }
 
     this.selectMeshes = function(mousePos) {
@@ -51,100 +77,68 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
         var done = false;
         var i = 0;
         var selectedNewMesh = undefined;
+        var selectedOldMesh = undefined;
+        console.log();
         while (i < intersects.length && !done) {
             if (intersects[i].object.position !== this.mousePointerCube.position) {
-                if (!this.meshSelection.includes(intersects[i].object)) {
+                if (this.meshSelectionGroup.getObjectById(intersects[0].object.id) === undefined) {
                     selectedNewMesh = intersects[i].object;
                 }
-                done = true;
-            }
-            i++;
-        }
-        i = 0;
-        done = false;
-        var selectedOldMesh = undefined;
-        while (i < intersectsToRemove.length && !done) {
-            if (intersectsToRemove[i].object.position !== this.mousePointerCube.position) {
-                if (this.meshSelection.includes(intersectsToRemove[i].object)) {
-                    selectedOldMesh = intersectsToRemove[i].object;
+                else {
+                    selectedOldMesh = intersects[i].object;
                 }
                 done = true;
             }
             i++;
         }
-
         var change = undefined;
-        if (selectedNewMesh !== undefined && selectedOldMesh !== undefined) {
-            if (selectedOldMesh.position.distanceTo(this.camera.position) < selectedNewMesh.position.distanceTo(this.camera.position)) change = true;
-            else change = false;
-        }
         if (selectedNewMesh !== undefined) change = false;
         else if (selectedOldMesh !== undefined) change = true;
 
         if (change === true) {
-            this.meshSelection.splice(this.meshSelection.indexOf(selectedOldMesh), 1);
             this.meshTransform.moveMeshToGroup(selectedOldMesh, this.meshSelectionGroup, this.scene);
             if (this.meshSelection.length < 1) {
                 this.emptyMeshSelection();
             }
         }
         else if (change === false) {
-            //TODO : center selection group position on selected objects
             this.meshTransform.addMeshToGroup(selectedNewMesh, this.meshSelectionGroup)
             this.transformControl.attach(this.meshSelectionGroup);
-            this.meshSelection.push(selectedNewMesh);
         }
     }
 
     this.deleteSelectedMeshes = function() {
         this.transformControl.detach();
-        for(var i = 0; i < this.meshSelection.length; i++) {
-            var cMesh = this.meshSelection[i];
+        for(var i = 0; i < this.meshSelectionGroup.children.length; i++) {
+            var cMesh = this.meshSelectionGroup.children[i];
             cMesh.geometry.dispose();
             cMesh.material.dispose();
             this.meshSelectionGroup.remove(cMesh);
         }
-        this.meshSelection = [];
     }
 
     this.emptyMeshSelection = function() {
-        console.log("full mesh selection reset");
         this.transformControl.detach();
         this.meshTransform.moveToGroup(this.meshSelectionGroup, scene);
-	    this.meshSelection = [];
-        this.resetSceneContent();
-        this.init();
+        this.resetSceneContent(true);
+        this.init(true);
     }
 
     this.highlightSelection = function() {
-        if (this.meshSelection.length > 0) {
-            for(var i = 0; i < this.meshSelection.length; i++) {
-                var cMesh = this.meshSelection[i];
-                cMesh.material.emissive = new THREE.Color(255, 255, 0);
-                cMesh.material.emissiveIntensity = 1;
-            }
-            for(var i = 0; i < this.scene.children.length; i++) {
-                var cMesh = this.scene.children[i];
-                if (this.meshSelection.includes(cMesh)) {
-                    cMesh.material.emissive = new THREE.Color(255, 255, 0);
-                    cMesh.material.emissiveIntensity = 0.5;
-                }
-                else{
-                    if (cMesh.material !== undefined) {
-                        cMesh.material.emissive = new THREE.Color(0, 0, 0);
-                        cMesh.material.emissiveIntensity = 0;
-                    }
-                }
-            }
+        for(var i = 0; i < this.selectionHelpers.length; i++) {
+            this.scene.remove(this.selectionHelpers[i]);
         }
-        else{
-            for(var i = 0; i < this.scene.children.length; i++) {
-                var cMesh = this.scene.children[i];
-                if (cMesh.material !== undefined) {
-                    cMesh.material.emissive = new THREE.Color(0, 0, 0);
-                    cMesh.material.emissiveIntensity = 0;
-                }
-            }
+        this.selectionHelpers = [];
+
+        var meshArray = this.meshSelectionGroup.children;
+        for(var i = 0; i < meshArray.length; i++) {
+            var cMesh = meshArray[i];
+            var boxHelper = new THREE.BoxHelper(cMesh, 0xff00ff);
+            boxHelper.update();
+            this.selectionHelpers.push(boxHelper);
+        }
+        for(var i = 0; i < this.selectionHelpers.length; i++) {
+            this.scene.add(this.selectionHelpers[i]);
         }
     }
 

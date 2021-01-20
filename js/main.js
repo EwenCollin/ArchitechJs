@@ -33,9 +33,10 @@ function init() {
 
 	renderer.shadowMap.enabled = true;
 	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-	
-	camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
-	camera.position.set(400, 200, 0);
+
+
+	sceneContentManager = new SceneContentManager(scene, window.innerWidth / window.innerHeight);
+	camera = sceneContentManager.groundReset(true);
 
 	// controls
 
@@ -57,9 +58,6 @@ function init() {
 
 	raycaster = new THREE.Raycaster();
 
-	sceneContentManager = new SceneContentManager(scene, camera);
-	sceneContentManager.groundReset(true);
-	scene.add(camera);
 
 	transformControlManager = new TransformControlManager(scene, camera, renderer.domElement, controls);
 	var transformControl = transformControlManager.getTransfromControl();

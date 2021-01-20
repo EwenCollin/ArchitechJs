@@ -57,6 +57,16 @@ var MeshTransform = function () {
         parent.remove(mesh);
     }
 
+    this.cloneToGroup = function(groupFrom, groupTo) {
+        for(var i = 0; i < groupFrom.children.length; i++) {
+            var cMesh = groupFrom.children[i];
+            var nMesh = cMesh.clone();
+            nMesh.applyMatrix(groupFrom.matrix);
+            groupTo.attach(nMesh);
+        }
+        console.log("groupTo:", groupTo.children);
+    }
+
     this.moveToGroup = function (meshGroup, scene) {
         for (var i = 0; i < meshGroup.children.length; i++) {
             var cRect = meshGroup.children[i];

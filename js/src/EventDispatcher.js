@@ -17,7 +17,9 @@ var EventDispatcher = function(line, rectMesh, selection, pointer, transformCont
         if (event.code === "KeyQ") self.line.trace();
 	    if (event.code === "KeyW") self.rectMesh.makeRect();
 	    if (event.code === "KeyS") self.selection.selectMeshes(self.mousePos);
-	    if (event.code === "Delete") self.selection.deleteSelectedMeshes();
+        if (event.code === "Delete") self.selection.deleteSelectedMeshes();
+        if (event.code === "KeyC") self.selection.copySelection();
+        if (event.code === "KeyV") self.selection.pasteCopy();
     }
 
     this.keyup = function(event) {
@@ -53,13 +55,14 @@ var EventDispatcher = function(line, rectMesh, selection, pointer, transformCont
     this.sceneExport = function() {
         self.line.resetSceneContent();
         self.rectMesh.resetSceneContent();
-        self.selection.resetSceneContent();
+        self.selection.resetSceneContent(false);
         self.pointer.resetSceneContent();
+        self.sceneContentManager.resetContent();
         self.sceneIO.export();
     }
     this.sceneLoad = function() {
-        self.sceneContentManager.groundReset(false);
-        self.sceneIO.load();
+        self.sceneIO.load(self.sceneContentManager.resetAfterLoad);
+        //self.sceneContentManager.groundReset(false);
     }
 }
 

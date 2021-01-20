@@ -4,7 +4,7 @@ var SceneIO = function(scene) {
 
     this.scene = scene;
 
-    this.load = function() {
+    this.load = function(callbackAfterLoad) {
         var input = document.createElement('input');
         input.type = 'file';
         input.onchange = e => {
@@ -17,16 +17,17 @@ var SceneIO = function(scene) {
             // here we tell the reader what to do when it's done reading...
             reader.onload = readerEvent => {
                 var content = readerEvent.target.result; // this is the content!
-                console.log(content);
                 this.scene = new THREE.ObjectLoader().parse(JSON.parse(content));
                 input.remove();
+                console.log(this.scene.children);
+                callbackAfterLoad();
             }
         }
         input.click();
     }
     
     this.export = function() {
-        console.log(this.scene);
+        console.log(this.scene.children);
         scene.updateMatrixWorld();
         const json = this.scene.toJSON();
         this.downloadStringAsJson(JSON.stringify(json), "scene");
