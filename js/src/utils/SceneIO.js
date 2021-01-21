@@ -1,10 +1,12 @@
 import * as THREE from '../../../build/three.module.js';
+import { MeshTransform } from './MeshTransform.js';
 
 var SceneIO = function(scene) {
 
     this.scene = scene;
+    this.meshTransform = new MeshTransform();
 
-    this.load = function(callbackAfterLoad) {
+    this.load = function(callbacks) {
         var input = document.createElement('input');
         input.type = 'file';
         input.onchange = e => {
@@ -17,10 +19,13 @@ var SceneIO = function(scene) {
             // here we tell the reader what to do when it's done reading...
             reader.onload = readerEvent => {
                 var content = readerEvent.target.result; // this is the content!
-                this.scene = new THREE.ObjectLoader().parse(JSON.parse(content));
+                var newScene = new THREE.ObjectLoader().parse(JSON.parse(content));
+                this.meshTransform.moveToGroup(newScene, this.scene);
                 input.remove();
                 console.log(this.scene.children);
-                callbackAfterLoad();
+                for(var i = 0; i < callbacks; i++) {
+                    callbacks[i]();
+                }
             }
         }
         input.click();

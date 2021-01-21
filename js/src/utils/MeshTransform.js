@@ -47,8 +47,8 @@ var MeshTransform = function () {
         newRect.receiveShadow = true;
         newRect.applyMatrix(meshGroup.matrix);
         meshGroup.remove(mesh);
-        mesh.material.dispose();
-        mesh.geometry.dispose();
+        if (mesh.material) mesh.material.dispose();
+        if (mesh.geometry) mesh.geometry.dispose();
         return newRect;
     }
 
@@ -143,7 +143,13 @@ var MeshTransform = function () {
 
     this.cutInMesh = function (meshA, meshB) {
         meshA.updateMatrix();
+        meshA.updateMatrixWorld();
+        meshA.applyMatrix4(meshA.parent.matrix);
         meshB.updateMatrix();
+        meshB.updateMatrixWorld();
+        meshB.geometry.computeBoundingBox();
+        meshB.geometry.computeBoundingSphere();
+        meshB.geometry.computeVertexNormals();
         var bspA = CSG.fromMesh(meshA);
         var bspB = CSG.fromMesh(meshB);
         var bspResult = bspB.subtract(bspA);

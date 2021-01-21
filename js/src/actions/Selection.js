@@ -44,9 +44,13 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
     this.init(false);
 
     this.resetSceneContent = function(soft) {
+        console.log(this.scene);
         this.meshTransform.moveToGroup(this.meshSelectionGroup, this.scene);
         this.scene.remove(this.meshSelectionGroup);
         if(soft !== true) this.scene.remove(this.meshCopyGroup);
+        this.transformControl.detach();
+        this.scene.remove(transformControl);
+        console.log(this.scene);
     }
 
     this.copySelection = function() {

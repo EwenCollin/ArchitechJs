@@ -61,7 +61,8 @@ var EventDispatcher = function(line, rectMesh, selection, pointer, transformCont
         self.sceneIO.export();
     }
     this.sceneLoad = function() {
-        self.sceneIO.load(self.sceneContentManager.resetAfterLoad);
+        var callbacks = [self.sceneContentManager.resetAfterLoad, self.selection.init, self.line.init, self.rectMesh.init, self.pointer.init]
+        self.sceneIO.load(callbacks);
         //self.sceneContentManager.groundReset(false);
     }
 }
