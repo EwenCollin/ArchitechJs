@@ -23,6 +23,7 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
 
     this.meshSelectionGroup;
     this.meshCopyGroup;
+    this.boxHelpersGroup;
 
     this.selectionHelpers = [];
 
@@ -35,6 +36,8 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
         this.copyPosition = new THREE.Vector3();
         this.meshSelectionGroup = new THREE.Group();
         this.scene.add(this.meshSelectionGroup);
+        this.boxHelpersGroup = new THREE.Group();
+        this.scene.add(this.boxHelpersGroup);
         if (soft !== true) {
             this.meshCopyGroup = new THREE.Group();
             this.meshCopyGroup.visible = false;
@@ -47,9 +50,13 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
         console.log(this.scene);
         this.meshTransform.moveToGroup(this.meshSelectionGroup, this.scene);
         this.scene.remove(this.meshSelectionGroup);
-        if(soft !== true) this.scene.remove(this.meshCopyGroup);
+        this.boxHelpersGroup.clear();
+        this.scene.remove(this.boxHelpersGroup);
         this.transformControl.detach();
-        this.scene.remove(transformControl);
+        if(soft !== true) {
+            this.scene.remove(this.meshCopyGroup);
+            this.scene.remove(transformControl);
+        }
         console.log(this.scene);
     }
 
@@ -67,48 +74,52 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
 
     this.pasteCopy = function() {
         this.emptyMeshSelection();
+        //TODO : preserve rotation and scale in copy group
         this.meshSelectionGroup.position.copy(this.meshCopyGroup.position);
         this.meshTransform.cloneToGroup(this.meshCopyGroup, this.meshSelectionGroup);
         this.transformControl.attach(this.meshSelectionGroup);
     }
 
     this.selectMeshes = function(mousePos) {
+        //If it does not work after some updates, try recursive raycast
         const onClickPosition = this.mouseRaycast.getMousePosition(this.rendererDomElement, mousePos.x, mousePos.y);
-
+        
         const intersects = this.mouseRaycast.getIntersects(onClickPosition, this.scene.children);
         const intersectsToRemove = this.mouseRaycast.getIntersects(onClickPosition, this.meshSelectionGroup.children);
 
-        var done = false;
-        var i = 0;
-        var selectedNewMesh = undefined;
-        var selectedOldMesh = undefined;
-        console.log();
-        while (i < intersects.length && !done) {
-            if (intersects[i].object.position !== this.mousePointerCube.position) {
-                if (this.meshSelectionGroup.getObjectById(intersects[0].object.id) === undefined) {
-                    selectedNewMesh = intersects[i].object;
-                }
-                else {
-                    selectedOldMesh = intersects[i].object;
-                }
-                done = true;
+        var mesh = null;
+        var newMesh = null;
+        if (intersects.length > 0 && intersectsToRemove.length > 0) {
+            var outMeshPos = new THREE.Vector3();
+            intersects[0].object.getWorldPosition(outMeshPos);
+            var inMeshPos = new THREE.Vector3();
+            intersectsToRemove[0].object.getWorldPosition(inMeshPos);
+            if (this.camera.position.distanceTo(outMeshPos) < this.camera.position.distanceTo(inMeshPos)) {
+                newMesh = true;
             }
-            i++;
+            else{
+                newMesh = false;
+            }
         }
-        var change = undefined;
-        if (selectedNewMesh !== undefined) change = false;
-        else if (selectedOldMesh !== undefined) change = true;
-
-        if (change === true) {
-            this.meshTransform.moveMeshToGroup(selectedOldMesh, this.meshSelectionGroup, this.scene);
-            if (this.meshSelection.length < 1) {
+        else if (intersects.length > 0) {
+            newMesh = true;
+        }
+        else if (intersectsToRemove.length > 0) {
+            newMesh = false;
+        }
+        if(newMesh === true) {
+            mesh = intersects[0].object;
+            this.meshTransform.addMeshToGroup(mesh, this.meshSelectionGroup)
+            this.transformControl.attach(this.meshSelectionGroup);
+        }
+        else if (newMesh === false) {
+            mesh = intersectsToRemove[0].object;
+            this.meshTransform.moveMeshToGroup(mesh, this.meshSelectionGroup, this.scene);
+            if (this.meshSelectionGroup.children.length < 1) {
                 this.emptyMeshSelection();
             }
         }
-        else if (change === false) {
-            this.meshTransform.addMeshToGroup(selectedNewMesh, this.meshSelectionGroup)
-            this.transformControl.attach(this.meshSelectionGroup);
-        }
+        console.log(this.transformControl);
     }
 
     this.deleteSelectedMeshes = function() {
@@ -130,7 +141,7 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
 
     this.highlightSelection = function() {
         for(var i = 0; i < this.selectionHelpers.length; i++) {
-            this.scene.remove(this.selectionHelpers[i]);
+            this.boxHelpersGroup.remove(this.selectionHelpers[i]);
         }
         this.selectionHelpers = [];
 
@@ -142,7 +153,7 @@ var Selection = function (scene, camera, raycaster, rendererDomElement, mousePoi
             this.selectionHelpers.push(boxHelper);
         }
         for(var i = 0; i < this.selectionHelpers.length; i++) {
-            this.scene.add(this.selectionHelpers[i]);
+            this.boxHelpersGroup.add(this.selectionHelpers[i]);
         }
     }
 

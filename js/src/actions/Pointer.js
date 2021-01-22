@@ -11,17 +11,22 @@ var Pointer = function(scene, raycaster, camera, rendererDomElement) {
     this.scene = scene;
 
     this.mousePointerCube;
+    this.mousePointerCubeGroup;
 
 
     this.mouseRaycast = new MouseRaycast(this.raycaster, this.camera)
 
     this.resetSceneContent = function() {
-        self.scene.remove(self.mousePointerCube);
+        self.mousePointerCubeGroup.remove(self.mousePointerCube);
+        self.scene.remove(self.mousePointerCubeGroup);
     }
     
     this.init = function() {
         this.mousePointerCube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshPhongMaterial({ color: 0xff00ff, flatShading: true }));
-        this.scene.add(this.mousePointerCube);
+        this.mousePointerCubeGroup = new THREE.Group();
+        
+        this.scene.add(this.mousePointerCubeGroup);
+        this.mousePointerCubeGroup.add(this.mousePointerCube);
     }
     this.init();
 

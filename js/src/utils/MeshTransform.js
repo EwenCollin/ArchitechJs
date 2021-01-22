@@ -1,5 +1,5 @@
 import * as THREE from '../../../build/three.module.js';
-import { CSG } from '../../ext/threejs-csg.js';
+import CSG from '../../ext/CSGMesh.js';
 
 var MeshTransform = function () {
 
@@ -13,6 +13,8 @@ var MeshTransform = function () {
     }
 
     this.cutGroup = function (meshGroup, transformCutMinAmount, scene) {
+        console.log(scene.children);
+        console.log(meshGroup);
         for (var i = 0; i < meshGroup.children.length; i++) {
             var cRect = meshGroup.children[i];
             if (cRect.scale.x < transformCutMinAmount && cRect.scale.x > - transformCutMinAmount) cRect.scale.x = transformCutMinAmount;
@@ -32,7 +34,6 @@ var MeshTransform = function () {
                 var newObject = this.cutInMesh(cRect, objectsToTransform[i]);
                 objectsToTransform[i].geometry.dispose();
                 objectsToTransform[i].geometry = newObject.geometry;
-
             }
             meshGroup.remove(cRect);
             cRect.geometry.dispose();
@@ -142,14 +143,10 @@ var MeshTransform = function () {
     }
 
     this.cutInMesh = function (meshA, meshB) {
-        meshA.updateMatrix();
-        meshA.updateMatrixWorld();
+        console.log("meshA", meshA, "meshB", meshB);
         meshA.applyMatrix4(meshA.parent.matrix);
+        meshA.updateMatrix();
         meshB.updateMatrix();
-        meshB.updateMatrixWorld();
-        meshB.geometry.computeBoundingBox();
-        meshB.geometry.computeBoundingSphere();
-        meshB.geometry.computeVertexNormals();
         var bspA = CSG.fromMesh(meshA);
         var bspB = CSG.fromMesh(meshB);
         var bspResult = bspB.subtract(bspA);
