@@ -23,7 +23,7 @@ Inspired by NEM (Nested Explorative Maps by Pauline Olivier, Renaud Chabrier, Da
 ## Library used in this web app
 
  - ThreeJs r124
- - ThreeJs-CSG (TS version)
+ - THREE-CSGMesh (TS version)
 
 The whole code added is in the /js folder (all the logic of the 3D editor). It is written in several files and classes to be more human readable and upgradable.
 
